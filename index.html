@@ -202,11 +202,65 @@
       font-weight: 800;
     }
 
-    .item-name {
+    .team-logo {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 3px;
+    }
+
+    .team-logo-fallback {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #e2e8f0;
+      color: #475569;
+      font-size: 0.72rem;
+      font-weight: 900;
+    }
+
+    .player-info {
       flex: 1;
+      min-width: 0;
+    }
+
+    .item-name {
+      display: block;
       font-weight: 800;
-      line-height: 1.25;
+      line-height: 1.2;
       overflow-wrap: anywhere;
+    }
+
+    .player-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+      margin-top: 4px;
+      color: #64748b;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .meta-chip {
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #334155;
+      padding: 3px 7px;
+      white-space: nowrap;
+    }
+
+    .metadata-status {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-top: 7px;
     }
 
     .status-badge {
@@ -289,7 +343,7 @@
   <div class="app">
     <header>
       <h1>Fantasy Selector</h1>
-      <p class="subtitle">Swipe right for WANT. Swipe left for DON'T WANT.</p>
+      <p class="subtitle">Swipe right for WANT. Swipe left for DON'T WANT.</p><div id="metadataStatus" class="metadata-status">Loading current player details…</div>
       <div class="toolbar">
         <input id="searchInput" class="search" type="search" placeholder="Search all lists by name..." autocomplete="off" />
         <button id="editBtn" class="btn">EDIT LIST</button>
@@ -343,13 +397,328 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'fantasySelectorDataV1';
+    const STORAGE_KEY = 'fantasySelectorData2026V1';
     const MAX_ITEMS = 300;
     const SWIPE_THRESHOLD = 90;
+    const PLAYER_CACHE_KEY = 'fantasySelectorPlayerMetadataV1';
+    const PLAYER_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+    const SLEEPER_PLAYERS_URL = 'https://api.sleeper.app/v1/players/nfl';
+
+    const TEAM_NAMES = {
+      ARI:'Arizona Cardinals', ATL:'Atlanta Falcons', BAL:'Baltimore Ravens', BUF:'Buffalo Bills',
+      CAR:'Carolina Panthers', CHI:'Chicago Bears', CIN:'Cincinnati Bengals', CLE:'Cleveland Browns',
+      DAL:'Dallas Cowboys', DEN:'Denver Broncos', DET:'Detroit Lions', GB:'Green Bay Packers',
+      HOU:'Houston Texans', IND:'Indianapolis Colts', JAX:'Jacksonville Jaguars', KC:'Kansas City Chiefs',
+      LV:'Las Vegas Raiders', LAC:'Los Angeles Chargers', LAR:'Los Angeles Rams', MIA:'Miami Dolphins',
+      MIN:'Minnesota Vikings', NE:'New England Patriots', NO:'New Orleans Saints', NYG:'New York Giants',
+      NYJ:'New York Jets', PHI:'Philadelphia Eagles', PIT:'Pittsburgh Steelers', SEA:'Seattle Seahawks',
+      SF:'San Francisco 49ers', TB:'Tampa Bay Buccaneers', TEN:'Tennessee Titans', WAS:'Washington Commanders'
+    };
+
+    const ESPN_TEAM_CODES = { WAS:'wsh' };
+    let playerMetadata = new Map();
 
     const sampleNames = [
-      'Sample Entry 1', 'Sample Entry 2', 'Sample Entry 3', 'Sample Entry 4',
-      'Sample Entry 5', 'Sample Entry 6', 'Sample Entry 7', 'Sample Entry 8'
+          "Jahmyr Gibbs",
+          "Bijan Robinson",
+          "Ja'Marr Chase",
+          "Puka Nacua",
+          "Jaxon Smith-Njigba",
+          "Christian McCaffrey",
+          "Amon-Ra St. Brown",
+          "Jonathan Taylor",
+          "CeeDee Lamb",
+          "Justin Jefferson",
+          "Ashton Jeanty",
+          "James Cook",
+          "Saquon Barkley",
+          "Omarion Hampton",
+          "Kenneth Walker III",
+          "Chase Brown",
+          "De'Von Achane",
+          "Derrick Henry",
+          "A.J. Brown",
+          "Drake London",
+          "Brock Bowers",
+          "Nico Collins",
+          "George Pickens",
+          "Jeremiyah Love",
+          "Rashee Rice",
+          "DeVonta Smith",
+          "Breece Hall",
+          "Trey McBride",
+          "Chris Olave",
+          "Zay Flowers",
+          "Kyren Williams",
+          "Emeka Egbuka",
+          "Tee Higgins",
+          "Ladd McConkey",
+          "Josh Allen",
+          "Javonte Williams",
+          "Travis Etienne Jr.",
+          "Malik Nabers",
+          "Tetairoa McMillan",
+          "Garrett Wilson",
+          "Josh Jacobs",
+          "Lamar Jackson",
+          "Sam LaPorta",
+          "Patrick Mahomes",
+          "Isiah Pacheco",
+          "Rhamondre Stevenson",
+          "Tank Dell",
+          "Jaylen Waddle",
+          "Jalen Hurts",
+          "C.J. Stroud",
+          "Dalton Kincaid",
+          "Brian Robinson Jr.",
+          "DK Metcalf",
+          "DJ Moore",
+          "Deebo Samuel Sr.",
+          "Brandon Aiyuk",
+          "Christian Watson",
+          "Jayden Daniels",
+          "Kyle Pitts",
+          "Rachaad White",
+          "Joe Burrow",
+          "Jordan Love",
+          "David Montgomery",
+          "D'Andre Swift",
+          "Alvin Kamara",
+          "Terry McLaurin",
+          "Michael Pittman Jr.",
+          "Amari Cooper",
+          "George Kittle",
+          "Jake Ferguson",
+          "James Conner",
+          "Najee Harris",
+          "Kyler Murray",
+          "Anthony Richardson",
+          "Trevor Lawrence",
+          "Zamir White",
+          "Zack Moss",
+          "Jonathon Brooks",
+          "Jayden Reed",
+          "Christian Kirk",
+          "Chris Godwin",
+          "Diontae Johnson",
+          "Evan Engram",
+          "Dallas Goedert",
+          "Caleb Williams",
+          "Brock Purdy",
+          "Jared Goff",
+          "Jaylen Warren",
+          "Tyjae Spears",
+          "Trey Benson",
+          "Keon Coleman",
+          "Xavier Worthy",
+          "Rome Odunze",
+          "Brian Thomas Jr.",
+          "David Njoku",
+          "Pat Freiermuth",
+          "Dak Prescott",
+          "Kirk Cousins",
+          "Tua Tagovailoa",
+          "Gus Edwards",
+          "J.K. Dobbins",
+          "Blake Corum",
+          "Courtland Sutton",
+          "Jakobi Meyers",
+          "DeAndre Hopkins",
+          "Calvin Ridley",
+          "Cole Kmet",
+          "Dalton Schultz",
+          "Justin Herbert",
+          "Baker Mayfield",
+          "Aaron Rodgers",
+          "Chuba Hubbard",
+          "Jerome Ford",
+          "Ray Davis",
+          "Khalil Shakir",
+          "Romeo Doubs",
+          "Dontayvion Wicks",
+          "Jauan Jennings",
+          "Hunter Henry",
+          "Taysom Hill",
+          "Matthew Stafford",
+          "Geno Smith",
+          "Rico Dowdle",
+          "Ezekiel Elliott",
+          "Bucky Irving",
+          "Jordan Addison",
+          "Demarcus Robinson",
+          "Jerry Jeudy",
+          "Tyler Lockett",
+          "Wan'Dale Robinson",
+          "Isaiah Likely",
+          "Noah Fant",
+          "Will Levis",
+          "Bryce Young",
+          "Tyler Allgeier",
+          "Ty Chandler",
+          "Antonio Gibson",
+          "Gabe Davis",
+          "Rashod Bateman",
+          "Darnell Mooney",
+          "Adam Thielen",
+          "Joshua Palmer",
+          "Jonnu Smith",
+          "Cade Otton",
+          "Deshaun Watson",
+          "Drake Maye",
+          "MarShawn Lloyd",
+          "Kimani Vidal",
+          "Khalil Herbert",
+          "Brandin Cooks",
+          "Mike Williams",
+          "Curtis Samuel",
+          "Adonai Mitchell",
+          "Ricky Pearsall",
+          "Tucker Kraft",
+          "Luke Musgrave",
+          "Bo Nix",
+          "Jacoby Brissett",
+          "Audric Estime",
+          "Braelon Allen",
+          "Dameon Pierce",
+          "Xavier Legette",
+          "Jalen McMillan",
+          "Javon Baker",
+          "DeMario Douglas",
+          "Rashon Shaheed",
+          "Ben Sinnott",
+          "Chigm Okonkwo",
+          "Russell Wilson",
+          "Daniel Jones",
+          "Justice Hill",
+          "Kenneth Gainwell",
+          "Alexander Mattison",
+          "Elijah Moore",
+          "Michael Wilson",
+          "Greg Dortch",
+          "Jalin Hyatt",
+          "Quentin Johnston",
+          "Tyler Conklin",
+          "Juwan Johnson",
+          "Aidan O'Connell",
+          "Gardner Minshew",
+          "Miles Sanders",
+          "Clyde Edwards-Helaire",
+          "Roschon Johnson",
+          "Tre Tucker",
+          "Marvin Mims Jr.",
+          "Jermaine Burton",
+          "Roman Wilson",
+          "Noah Brown",
+          "Mike Gesicki",
+          "Michael Mayer",
+          "Derek Carr",
+          "Sam Darnold",
+          "Tank Bigsby",
+          "D'Onta Foreman",
+          "Tyrone Tracy Jr.",
+          "Darius Slayton",
+          "Odell Beckham Jr.",
+          "Allen Lazard",
+          "K.J. Osborn",
+          "Kalif Raymond",
+          "Zach Ertz",
+          "Colby Parkinson",
+          "Drew Lock",
+          "Mac Jones",
+          "Jamaal Williams",
+          "Samaje Perine",
+          "Dylan Laube",
+          "Nelson Agholor",
+          "Robert Woods",
+          "Cedric Tillman",
+          "John Metchie III",
+          "Jalen Tolbert",
+          "Theo Johnson",
+          "Erick All",
+          "Justin Fields",
+          "Tyler Huntley",
+          "Keaontay Ingram",
+          "Will Shipley",
+          "Isaac Guerendo",
+          "Jonathan Mingo",
+          "Tutu Atwell",
+          "Skyy Moore",
+          "Tre'Quan Smith",
+          "Trey Palmer",
+          "Ja'Tavion Sanders",
+          "Jelani Woods",
+          "Jimmy Garoppolo",
+          "Tyrod Taylor",
+          "Rasheen Ali",
+          "Cody Schrader",
+          "Evan Hull",
+          "Rondale Moore",
+          "A.T. Perry",
+          "Olamide Zaccheaus",
+          "Tyler Boyd",
+          "Van Jefferson",
+          "Daniel Bellinger",
+          "Dawson Knox",
+          "Jameis Winston",
+          "Marcus Mariota",
+          "Michael Carter",
+          "Chris Rodriguez Jr.",
+          "Boston Scott",
+          "Malik Washington",
+          "Devaughn Vele",
+          "Brenden Rice",
+          "Tejuan Palmer",
+          "Parker Washington",
+          "Donald Parham Jr.",
+          "Tanner Hudson",
+          "Joe Flacco",
+          "Kenny Pickett",
+          "Pierre Strong Jr.",
+          "Eric Gray",
+          "DeWayne McBride",
+          "Jamari Thrash",
+          "Luke McCaffrey",
+          "Jacob Cowing",
+          "Tahj Washington",
+          "Cornelius Johnson",
+          "Gerald Everett",
+          "Hayden Hurst",
+          "Carson Wentz",
+          "Hendon Hooker",
+          "Israel Abanikanda",
+          "Sean Tucker",
+          "Elijah Mitchell",
+          "Johnny Wilson",
+          "Casey Washington",
+          "Bub Means",
+          "Ryan Flournoy",
+          "Devontez Walker",
+          "Brevin Jordan",
+          "Will Dissly",
+          "Michael Penix Jr.",
+          "J.J. McCarthy",
+          "Kenyatta Jackson",
+          "Louis Rees-Zammit",
+          "Jawhar Jordan",
+          "Marcus Rosemy-Jacksaint",
+          "Anthony Gould",
+          "Malik Knowles",
+          "Jha'Quan Jackson",
+          "Jordan Whittington",
+          "Darnell Washington",
+          "Brock Wright",
+          "Stetson Bennett",
+          "Kyle Trask",
+          "Keilan Robinson",
+          "Sione Vaki",
+          "Emani Bailey",
+          "Amani Toomer Jr.",
+          "Isaiah Williams",
+          "Jalen Coker",
+          "Xavier Smith",
+          "Mason McCormick",
+          "AJ Barner",
+          "Jaheim Bell"
     ];
 
     let state = loadState();
@@ -364,6 +733,7 @@
     const listEditor = document.getElementById('listEditor');
     const formatArea = document.getElementById('formatArea');
     const exportLabel = document.getElementById('exportLabel');
+    const metadataStatus = document.getElementById('metadataStatus');
 
     function loadState() {
       try {
@@ -400,7 +770,11 @@
       const query = searchInput.value.trim().toLowerCase();
       const isGlobalSearch = query.length > 0;
       const items = (isGlobalSearch ? state.items.slice() : getItems(currentView))
-        .filter(item => item.name.toLowerCase().includes(query))
+        .filter(item => {
+          const meta = getPlayerMeta(item.name);
+          const haystack = [item.name, meta.position, meta.team, meta.teamName].join(' ').toLowerCase();
+          return haystack.includes(query);
+        })
         .sort((a, b) => a.originalIndex - b.originalIndex);
 
       hint.textContent = isGlobalSearch
@@ -430,17 +804,104 @@
 
       const body = document.createElement('div');
       body.className = 'card-body';
+      const meta = getPlayerMeta(item.name);
       body.innerHTML = `
         <span class="index">${item.originalIndex + 1}</span>
-        <span class="item-name"></span>
+        ${meta.logo ? `<img class="team-logo" src="${meta.logo}" alt="${escapeHtml(meta.teamName || meta.team)} logo" loading="lazy">` : `<span class="team-logo-fallback">${escapeHtml(meta.team || 'NFL')}</span>`}
+        <span class="player-info">
+          <span class="item-name"></span>
+          <span class="player-meta">
+            <span class="meta-chip">${escapeHtml(meta.position || 'Position —')}</span>
+            <span class="meta-chip">${escapeHtml(meta.teamName || meta.team || 'Team unlisted')}</span>
+          </span>
+        </span>
         ${item.status === 'want' ? '<span class="status-badge want">WANT</span>' : ''}
         ${item.status === 'dont' ? '<span class="status-badge dont">DON\'T WANT</span>' : ''}
       `;
       body.querySelector('.item-name').textContent = item.name;
+      const logo = body.querySelector('.team-logo');
+      if (logo) logo.addEventListener('error', () => {
+        const fallback = document.createElement('span');
+        fallback.className = 'team-logo-fallback';
+        fallback.textContent = meta.team || 'NFL';
+        logo.replaceWith(fallback);
+      }, { once: true });
 
       card.append(bg, body);
       attachSwipe(card, body, bg, item);
       return card;
+    }
+
+    function normalizePlayerName(name) {
+      return String(name || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+
+    function teamLogoUrl(team) {
+      if (!team || !TEAM_NAMES[team]) return '';
+      const code = ESPN_TEAM_CODES[team] || team.toLowerCase();
+      return `https://a.espncdn.com/i/teamlogos/nfl/500/${code}.png`;
+    }
+
+    function getPlayerMeta(name) {
+      return playerMetadata.get(normalizePlayerName(name)) || {
+        position: '', team: '', teamName: '', logo: ''
+      };
+    }
+
+    function buildPlayerMetadata(players) {
+      const map = new Map();
+      Object.values(players || {}).forEach(player => {
+        const fullName = player.full_name || [player.first_name, player.last_name].filter(Boolean).join(' ');
+        if (!fullName) return;
+        const key = normalizePlayerName(fullName);
+        if (!key) return;
+        const team = player.team || '';
+        const position = player.position || (Array.isArray(player.fantasy_positions) ? player.fantasy_positions[0] : '') || '';
+        const record = {
+          position,
+          team,
+          teamName: TEAM_NAMES[team] || (team ? team : ''),
+          logo: teamLogoUrl(team)
+        };
+        map.set(key, record);
+
+        const shortFirst = player.first_name && player.first_name.length ? player.first_name[0] : '';
+        if (shortFirst && player.last_name) map.set(normalizePlayerName(`${shortFirst} ${player.last_name}`), record);
+      });
+      return map;
+    }
+
+    async function loadPlayerMetadata() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(PLAYER_CACHE_KEY) || 'null');
+        if (cached && cached.savedAt && cached.players && Date.now() - cached.savedAt < PLAYER_CACHE_MAX_AGE) {
+          playerMetadata = buildPlayerMetadata(cached.players);
+          metadataStatus.textContent = 'Current team and position details loaded';
+          render();
+          return;
+        }
+      } catch (_) {}
+
+      try {
+        metadataStatus.textContent = 'Refreshing current NFL player details…';
+        const response = await fetch(SLEEPER_PLAYERS_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Player data request failed: ${response.status}`);
+        const players = await response.json();
+        playerMetadata = buildPlayerMetadata(players);
+        try { localStorage.setItem(PLAYER_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), players })); } catch (_) {}
+        metadataStatus.textContent = 'Current team and position details updated';
+        render();
+      } catch (error) {
+        metadataStatus.textContent = playerMetadata.size
+          ? 'Using saved player details'
+          : 'Player details unavailable — connect to the internet and reload';
+        console.warn(error);
+        render();
+      }
     }
 
     function attachSwipe(card, body, bg, item) {
@@ -632,13 +1093,13 @@
     }
 
     function exportDoc(title, items) {
-      const rows = items.map((item, i) => `<p>${i + 1}. ${escapeHtml(item.name)}</p>`).join('');
+      const rows = items.map((item, i) => { const m = getPlayerMeta(item.name); return `<p>${i + 1}. ${escapeHtml(item.name)} — ${escapeHtml(m.position || '—')} — ${escapeHtml(m.teamName || m.team || 'Unlisted')}</p>`; }).join('');
       const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><h1>${escapeHtml(title)}</h1><p>${items.length} items</p>${rows}</body></html>`;
       downloadBlob(new Blob([html], { type: 'application/msword' }), `${safeName(title)}.doc`);
     }
 
     function exportPdf(title, items) {
-      const lines = [title, `${items.length} items`, '', ...items.map((item, i) => `${i + 1}. ${item.name}`)];
+      const lines = [title, `${items.length} items`, '', ...items.map((item, i) => { const m = getPlayerMeta(item.name); return `${i + 1}. ${item.name} | ${m.position || '—'} | ${m.teamName || m.team || 'Unlisted'}`; })];
       const pages = [];
       const pageWidth = 612;
       const pageHeight = 792;
@@ -716,7 +1177,7 @@
 
     function exportXlsx(title, items) {
       const sheetName = exportChoice === 'want' ? 'Want' : 'Dont Want';
-      const rows = [['Number', 'Name'], ...items.map((item, i) => [i + 1, item.name])];
+      const rows = [['Number', 'Name', 'Position', 'Team'], ...items.map((item, i) => { const m = getPlayerMeta(item.name); return [i + 1, item.name, m.position || '', m.teamName || m.team || 'Unlisted']; })];
       const xmlRows = rows.map(row => `<row>${row.map(cell => `<c t="inlineStr"><is><t>${escapeXml(String(cell))}</t></is></c>`).join('')}</row>`).join('');
 
       const files = {
@@ -824,6 +1285,8 @@
     });
 
     render();
+    loadPlayerMetadata();
   </script>
 </body>
 </html>
+
