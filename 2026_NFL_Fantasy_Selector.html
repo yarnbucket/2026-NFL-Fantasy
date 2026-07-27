@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Fantasy Selector</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --line: #334155;
+      --want: #16a34a;
+      --dont: #dc2626;
+      --accent: #7c3aed;
+      --card: #ffffff;
+      --card-text: #111827;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+      color: var(--text);
+      overscroll-behavior: none;
+    }
+
+    button, input, textarea { font: inherit; }
+
+    .app {
+      width: min(100%, 900px);
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 16px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.96);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(1.55rem, 4vw, 2.3rem);
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .search {
+      min-width: 0;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0b1220;
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+    }
+
+    .search:focus { border-color: #8b5cf6; }
+
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 13px;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+      background: var(--accent);
+    }
+
+    .btn.secondary { background: #334155; }
+    .btn.danger { background: #991b1b; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 113px;
+      z-index: 15;
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 8px;
+      color: var(--text);
+      background: #0b1220;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .tab.active { border-color: #a78bfa; background: #2e1065; }
+    .tab.want.active { background: #14532d; border-color: #22c55e; }
+    .tab.dont.active { background: #7f1d1d; border-color: #ef4444; }
+
+    .tab small { display: block; color: #cbd5e1; margin-top: 2px; font-size: 0.75rem; }
+
+    .content {
+      flex: 1;
+      padding: 14px 16px 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hint {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 10px;
+    }
+
+    .list {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 30px;
+      flex: 1;
+    }
+
+    .card {
+      position: relative;
+      margin: 0 0 10px;
+      border-radius: 14px;
+      min-height: 62px;
+      overflow: hidden;
+      background: transparent;
+      touch-action: pan-y;
+      user-select: none;
+    }
+
+    .swipe-bg {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    .swipe-bg.want { background: var(--want); }
+    .swipe-bg.dont { background: var(--dont); }
+
+    .card-body {
+      position: relative;
+      z-index: 2;
+      min-height: 62px;
+      border-radius: 14px;
+      background: var(--card);
+      color: var(--card-text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 16px;
+      box-shadow: 0 5px 16px rgba(0,0,0,.18);
+      transform: translateX(0);
+      transition: transform 180ms ease, opacity 180ms ease;
+      cursor: grab;
+    }
+
+    .index {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 0.83rem;
+      font-weight: 800;
+    }
+
+    .item-name {
+      flex: 1;
+      font-weight: 800;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .status-badge {
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      color: white;
+      white-space: nowrap;
+    }
+    .status-badge.want { background: var(--want); }
+    .status-badge.dont { background: var(--dont); }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 44px 10px;
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 100;
+    }
+
+    .modal.open { display: flex; }
+
+    .modal-card {
+      width: min(100%, 680px);
+      max-height: 90vh;
+      overflow: auto;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.5);
+    }
+
+    .modal-card h2 { margin-top: 0; }
+
+    textarea {
+      width: 100%;
+      min-height: 330px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0b1220;
+      color: var(--text);
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .modal-actions, .export-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .export-grid .btn { flex: 1 1 120px; }
+
+    .count-note { color: var(--muted); font-size: 0.88rem; }
+
+    @media (max-width: 620px) {
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .search { grid-column: 1 / -1; }
+      .tabs { top: 159px; }
+      .btn { padding: 11px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Fantasy Selector</h1>
+      <p class="subtitle">Swipe right for WANT. Swipe left for DON'T WANT.</p>
+      <div class="toolbar">
+        <input id="searchInput" class="search" type="search" placeholder="Search all lists by name..." autocomplete="off" />
+        <button id="editBtn" class="btn">EDIT LIST</button>
+        <button id="exportBtn" class="btn secondary">EXPORT</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-view="main">MAIN<small id="mainCount">0</small></button>
+      <button class="tab want" data-view="want">WANT<small id="wantCount">0</small></button>
+      <button class="tab dont" data-view="dont">DON'T WANT<small id="dontCount">0</small></button>
+    </nav>
+
+    <main class="content">
+      <p id="hint" class="hint"></p>
+      <section id="list" class="list" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <div id="editModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal-card">
+      <h2 id="editTitle">Edit Main List</h2>
+      <p class="count-note">Enter one name per line. Up to 300 entries. Existing choices are preserved when names still match.</p>
+      <textarea id="listEditor" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button id="saveListBtn" class="btn">SAVE LIST</button>
+        <button id="cancelEditBtn" class="btn secondary">CANCEL</button>
+        <button id="resetAllBtn" class="btn danger">RESET EVERYTHING</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="exportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <div class="modal-card">
+      <h2 id="exportTitle">Export Selected List</h2>
+      <p class="count-note">Choose which list to save, then select a format.</p>
+      <div class="modal-actions">
+        <button id="chooseWant" class="btn" style="background:#15803d">WANT</button>
+        <button id="chooseDont" class="btn" style="background:#b91c1c">DON'T WANT</button>
+        <button id="closeExportBtn" class="btn secondary">CLOSE</button>
+      </div>
+      <div id="formatArea" hidden>
+        <p id="exportLabel" class="count-note" style="margin-top:16px"></p>
+        <div class="export-grid">
+          <button class="btn secondary" data-format="pdf">SAVE .PDF</button>
+          <button class="btn secondary" data-format="doc">SAVE .DOC</button>
+          <button class="btn secondary" data-format="xlsx">SAVE .XLSX</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'fantasySelectorDataV1';
+    const MAX_ITEMS = 300;
+    const SWIPE_THRESHOLD = 90;
+
+    const sampleNames = [
+      'Sample Entry 1', 'Sample Entry 2', 'Sample Entry 3', 'Sample Entry 4',
+      'Sample Entry 5', 'Sample Entry 6', 'Sample Entry 7', 'Sample Entry 8'
+    ];
+
+    let state = loadState();
+    let currentView = 'main';
+    let exportChoice = 'want';
+
+    const listEl = document.getElementById('list');
+    const searchInput = document.getElementById('searchInput');
+    const hint = document.getElementById('hint');
+    const editModal = document.getElementById('editModal');
+    const exportModal = document.getElementById('exportModal');
+    const listEditor = document.getElementById('listEditor');
+    const formatArea = document.getElementById('formatArea');
+    const exportLabel = document.getElementById('exportLabel');
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && Array.isArray(saved.items)) return saved;
+      } catch (_) {}
+      return {
+        items: sampleNames.map((name, index) => ({ id: cryptoId(), name, originalIndex: index, status: 'main' }))
+      };
+    }
+
+    function cryptoId() {
+      return (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function getItems(status) {
+      return state.items
+        .filter(item => item.status === status)
+        .sort((a, b) => a.originalIndex - b.originalIndex);
+    }
+
+    function updateCounts() {
+      document.getElementById('mainCount').textContent = getItems('main').length;
+      document.getElementById('wantCount').textContent = getItems('want').length;
+      document.getElementById('dontCount').textContent = getItems('dont').length;
+    }
+
+    function render() {
+      updateCounts();
+      const query = searchInput.value.trim().toLowerCase();
+      const isGlobalSearch = query.length > 0;
+      const items = (isGlobalSearch ? state.items.slice() : getItems(currentView))
+        .filter(item => item.name.toLowerCase().includes(query))
+        .sort((a, b) => a.originalIndex - b.originalIndex);
+
+      hint.textContent = isGlobalSearch
+        ? "GLOBAL SEARCH: showing matches from Main, Want, and Don't Want"
+        : currentView === 'main'
+          ? "Swipe right for WANT • Swipe left for DON'T WANT"
+          : currentView === 'want'
+            ? 'Swipe left to return an item to its original place in the Main List'
+            : 'Swipe right to return an item to its original place in the Main List';
+
+      listEl.innerHTML = '';
+      if (!items.length) {
+        listEl.innerHTML = `<div class="empty">${query ? 'No matching entries in any list.' : 'No entries in this list.'}</div>`;
+        return;
+      }
+
+      items.forEach(item => listEl.appendChild(createCard(item)));
+    }
+
+    function createCard(item) {
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.dataset.id = item.id;
+
+      const bg = document.createElement('div');
+      bg.className = 'swipe-bg';
+
+      const body = document.createElement('div');
+      body.className = 'card-body';
+      body.innerHTML = `
+        <span class="index">${item.originalIndex + 1}</span>
+        <span class="item-name"></span>
+        ${item.status === 'want' ? '<span class="status-badge want">WANT</span>' : ''}
+        ${item.status === 'dont' ? '<span class="status-badge dont">DON\'T WANT</span>' : ''}
+      `;
+      body.querySelector('.item-name').textContent = item.name;
+
+      card.append(bg, body);
+      attachSwipe(card, body, bg, item);
+      return card;
+    }
+
+    function attachSwipe(card, body, bg, item) {
+      let startX = 0;
+      let startY = 0;
+      let currentX = 0;
+      let dragging = false;
+      let horizontal = false;
+
+      const reset = () => {
+        body.style.transform = 'translateX(0)';
+        bg.style.opacity = '0';
+        dragging = false;
+        horizontal = false;
+      };
+
+      card.addEventListener('pointerdown', e => {
+        startX = e.clientX;
+        startY = e.clientY;
+        currentX = 0;
+        dragging = true;
+        body.style.transition = 'none';
+        card.setPointerCapture(e.pointerId);
+      });
+
+      card.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!horizontal && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return;
+        if (Math.abs(dx) > 8) horizontal = true;
+        if (!horizontal) return;
+
+        let allowed = false;
+        if (item.status === 'main') allowed = true;
+        if (item.status === 'want' && dx < 0) allowed = true;
+        if (item.status === 'dont' && dx > 0) allowed = true;
+
+        currentX = allowed ? dx : dx * 0.2;
+        body.style.transform = `translateX(${currentX}px)`;
+        bg.style.opacity = String(Math.min(Math.abs(currentX) / SWIPE_THRESHOLD, 1));
+
+        if (item.status === 'main') {
+          bg.className = `swipe-bg ${currentX >= 0 ? 'want' : 'dont'}`;
+          bg.innerHTML = currentX >= 0 ? '<span>WANT</span><span>→</span>' : '<span>←</span><span>DON\'T WANT</span>';
+        } else {
+          bg.className = `swipe-bg ${item.status === 'want' ? 'dont' : 'want'}`;
+          bg.innerHTML = item.status === 'want' ? '<span>←</span><span>RETURN</span>' : '<span>RETURN</span><span>→</span>';
+        }
+      });
+
+      const finish = () => {
+        body.style.transition = 'transform 180ms ease, opacity 180ms ease';
+        if (!dragging) return;
+        const passed = Math.abs(currentX) >= SWIPE_THRESHOLD;
+
+        if (passed) {
+          let nextStatus = item.status;
+          if (item.status === 'main') nextStatus = currentX > 0 ? 'want' : 'dont';
+          else if (item.status === 'want' && currentX < 0) nextStatus = 'main';
+          else if (item.status === 'dont' && currentX > 0) nextStatus = 'main';
+
+          if (nextStatus !== item.status) {
+            body.style.transform = `translateX(${currentX > 0 ? 700 : -700}px)`;
+            body.style.opacity = '0';
+            if (navigator.vibrate) navigator.vibrate(30);
+            setTimeout(() => {
+              item.status = nextStatus;
+              saveState();
+              render();
+            }, 150);
+            return;
+          }
+        }
+        reset();
+      };
+
+      card.addEventListener('pointerup', finish);
+      card.addEventListener('pointercancel', finish);
+    }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        currentView = tab.dataset.view;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        render();
+      });
+    });
+
+    searchInput.addEventListener('input', render);
+
+    document.getElementById('editBtn').addEventListener('click', () => {
+      listEditor.value = state.items
+        .slice()
+        .sort((a, b) => a.originalIndex - b.originalIndex)
+        .map(item => item.name)
+        .join('\n');
+      editModal.classList.add('open');
+    });
+
+    document.getElementById('cancelEditBtn').addEventListener('click', () => editModal.classList.remove('open'));
+
+    document.getElementById('saveListBtn').addEventListener('click', () => {
+      const names = listEditor.value
+        .split(/\r?\n/)
+        .map(v => v.trim())
+        .filter(Boolean)
+        .slice(0, MAX_ITEMS);
+
+      const existingByName = new Map();
+      state.items.forEach(item => {
+        const key = item.name.toLowerCase();
+        if (!existingByName.has(key)) existingByName.set(key, []);
+        existingByName.get(key).push(item);
+      });
+
+      state.items = names.map((name, index) => {
+        const key = name.toLowerCase();
+        const matchList = existingByName.get(key);
+        const match = matchList && matchList.length ? matchList.shift() : null;
+        return match
+          ? { ...match, name, originalIndex: index }
+          : { id: cryptoId(), name, originalIndex: index, status: 'main' };
+      });
+
+      saveState();
+      editModal.classList.remove('open');
+      currentView = 'main';
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'main'));
+      render();
+    });
+
+    document.getElementById('resetAllBtn').addEventListener('click', () => {
+      if (!confirm('Reset the entire list and all saved choices?')) return;
+      state = { items: sampleNames.map((name, index) => ({ id: cryptoId(), name, originalIndex: index, status: 'main' })) };
+      saveState();
+      editModal.classList.remove('open');
+      currentView = 'main';
+      searchInput.value = '';
+      render();
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      formatArea.hidden = true;
+      exportModal.classList.add('open');
+    });
+    document.getElementById('closeExportBtn').addEventListener('click', () => exportModal.classList.remove('open'));
+    document.getElementById('chooseWant').addEventListener('click', () => chooseExport('want'));
+    document.getElementById('chooseDont').addEventListener('click', () => chooseExport('dont'));
+
+    function chooseExport(status) {
+      exportChoice = status;
+      const title = status === 'want' ? 'WANT' : "DON'T WANT";
+      const count = getItems(status).length;
+      exportLabel.textContent = `${title}: ${count} item${count === 1 ? '' : 's'}`;
+      formatArea.hidden = false;
+    }
+
+    document.querySelectorAll('[data-format]').forEach(btn => {
+      btn.addEventListener('click', () => exportList(btn.dataset.format));
+    });
+
+    function exportList(format) {
+      const items = getItems(exportChoice);
+      if (!items.length) {
+        alert('This list is empty.');
+        return;
+      }
+      const title = exportChoice === 'want' ? 'Fantasy Selector - WANT' : "Fantasy Selector - DON'T WANT";
+      if (format === 'doc') exportDoc(title, items);
+      if (format === 'pdf') exportPdf(title, items);
+      if (format === 'xlsx') exportXlsx(title, items);
+    }
+
+    function safeName(title) {
+      return title.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function exportDoc(title, items) {
+      const rows = items.map((item, i) => `<p>${i + 1}. ${escapeHtml(item.name)}</p>`).join('');
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><h1>${escapeHtml(title)}</h1><p>${items.length} items</p>${rows}</body></html>`;
+      downloadBlob(new Blob([html], { type: 'application/msword' }), `${safeName(title)}.doc`);
+    }
+
+    function exportPdf(title, items) {
+      const lines = [title, `${items.length} items`, '', ...items.map((item, i) => `${i + 1}. ${item.name}`)];
+      const pages = [];
+      const pageWidth = 612;
+      const pageHeight = 792;
+      const margin = 48;
+      const lineHeight = 16;
+      const maxChars = 78;
+      const wrapped = [];
+
+      lines.forEach(line => {
+        if (!line) {
+          wrapped.push('');
+          return;
+        }
+        let remaining = line;
+        while (remaining.length > maxChars) {
+          let cut = remaining.lastIndexOf(' ', maxChars);
+          if (cut < 1) cut = maxChars;
+          wrapped.push(remaining.slice(0, cut));
+          remaining = remaining.slice(cut).trimStart();
+        }
+        wrapped.push(remaining);
+      });
+
+      const linesPerPage = Math.floor((pageHeight - margin * 2) / lineHeight);
+      for (let i = 0; i < wrapped.length; i += linesPerPage) pages.push(wrapped.slice(i, i + linesPerPage));
+
+      const objects = [];
+      const addObject = content => { objects.push(content); return objects.length; };
+      const catalogId = addObject('');
+      const pagesId = addObject('');
+      const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+      const pageIds = [];
+
+      pages.forEach(pageLines => {
+        const commands = ['BT', '/F1 12 Tf', `${margin} ${pageHeight - margin} Td`];
+        pageLines.forEach((line, index) => {
+          if (index > 0) commands.push(`0 -${lineHeight} Td`);
+          commands.push(`(${escapePdf(line)}) Tj`);
+        });
+        commands.push('ET');
+        const stream = commands.join('\n');
+        const contentId = addObject(`<< /Length ${byteLength(stream)} >>\nstream\n${stream}\nendstream`);
+        const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+        pageIds.push(pageId);
+      });
+
+      objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+      objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
+
+      let pdf = '%PDF-1.4\n';
+      const offsets = [0];
+      objects.forEach((object, index) => {
+        offsets.push(byteLength(pdf));
+        pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+      });
+      const xrefOffset = byteLength(pdf);
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      for (let i = 1; i < offsets.length; i++) pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+      pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+      downloadBlob(new Blob([pdf], { type: 'application/pdf' }), `${safeName(title)}.pdf`);
+    }
+
+    function escapePdf(text) {
+      return String(text)
+        .replace(/[^\x20-\x7E]/g, '?')
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)');
+    }
+
+    function byteLength(text) {
+      return new TextEncoder().encode(text).length;
+    }
+
+    function exportXlsx(title, items) {
+      const sheetName = exportChoice === 'want' ? 'Want' : 'Dont Want';
+      const rows = [['Number', 'Name'], ...items.map((item, i) => [i + 1, item.name])];
+      const xmlRows = rows.map(row => `<row>${row.map(cell => `<c t="inlineStr"><is><t>${escapeXml(String(cell))}</t></is></c>`).join('')}</row>`).join('');
+
+      const files = {
+        '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`,
+        '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
+        'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+        'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+        'xl/worksheets/sheet1.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${xmlRows}</sheetData></worksheet>`,
+        'docProps/core.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${escapeXml(title)}</dc:title><dc:creator>Fantasy Selector</dc:creator></cp:coreProperties>`,
+        'docProps/app.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Fantasy Selector</Application></Properties>`
+      };
+
+      const blob = createZip(files);
+      downloadBlob(blob, `${safeName(title)}.xlsx`);
+    }
+
+    function createZip(files) {
+      const encoder = new TextEncoder();
+      const fileEntries = [];
+      const centralEntries = [];
+      let offset = 0;
+
+      Object.entries(files).forEach(([name, text]) => {
+        const nameBytes = encoder.encode(name);
+        const data = encoder.encode(text);
+        const crc = crc32(data);
+
+        const local = new Uint8Array(30 + nameBytes.length + data.length);
+        const v = new DataView(local.buffer);
+        v.setUint32(0, 0x04034b50, true);
+        v.setUint16(4, 20, true);
+        v.setUint16(6, 0, true);
+        v.setUint16(8, 0, true);
+        v.setUint16(10, 0, true);
+        v.setUint16(12, 0, true);
+        v.setUint32(14, crc, true);
+        v.setUint32(18, data.length, true);
+        v.setUint32(22, data.length, true);
+        v.setUint16(26, nameBytes.length, true);
+        v.setUint16(28, 0, true);
+        local.set(nameBytes, 30);
+        local.set(data, 30 + nameBytes.length);
+        fileEntries.push(local);
+
+        const central = new Uint8Array(46 + nameBytes.length);
+        const c = new DataView(central.buffer);
+        c.setUint32(0, 0x02014b50, true);
+        c.setUint16(4, 20, true);
+        c.setUint16(6, 20, true);
+        c.setUint16(8, 0, true);
+        c.setUint16(10, 0, true);
+        c.setUint16(12, 0, true);
+        c.setUint16(14, 0, true);
+        c.setUint32(16, crc, true);
+        c.setUint32(20, data.length, true);
+        c.setUint32(24, data.length, true);
+        c.setUint16(28, nameBytes.length, true);
+        c.setUint16(30, 0, true);
+        c.setUint16(32, 0, true);
+        c.setUint16(34, 0, true);
+        c.setUint16(36, 0, true);
+        c.setUint32(38, 0, true);
+        c.setUint32(42, offset, true);
+        central.set(nameBytes, 46);
+        centralEntries.push(central);
+        offset += local.length;
+      });
+
+      const centralSize = centralEntries.reduce((sum, a) => sum + a.length, 0);
+      const end = new Uint8Array(22);
+      const e = new DataView(end.buffer);
+      e.setUint32(0, 0x06054b50, true);
+      e.setUint16(4, 0, true);
+      e.setUint16(6, 0, true);
+      e.setUint16(8, centralEntries.length, true);
+      e.setUint16(10, centralEntries.length, true);
+      e.setUint32(12, centralSize, true);
+      e.setUint32(16, offset, true);
+      e.setUint16(20, 0, true);
+
+      return new Blob([...fileEntries, ...centralEntries, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+
+    function crc32(bytes) {
+      let crc = 0xffffffff;
+      for (const byte of bytes) {
+        crc ^= byte;
+        for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>'"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[ch]));
+    }
+
+    function escapeXml(text) {
+      return escapeHtml(text);
+    }
+
+    [editModal, exportModal].forEach(modal => {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) modal.classList.remove('open');
+      });
+    });
+
+    render();
+  </script>
+</body>
+</html>
